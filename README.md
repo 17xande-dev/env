@@ -25,9 +25,9 @@ concurrent use.
 | `String` | A string as given. |
 | `Required` | A non-empty string. |
 | `Bool` | An exact boolean. |
-| `Int` | A decimal integer with inclusive bounds. |
+| `Int` | A decimal integer with inclusive bounds. Use `math.MaxInt` for no upper limit. |
 | `Duration` | A Go duration with inclusive bounds; a maximum of zero means no upper limit. |
-| `List` | Comma-separated items, with surrounding whitespace and empty items removed. |
+| `List` | Comma-separated items, with surrounding whitespace and empty items removed. An unset or empty setting returns the default slice as-is. A non-empty setting with no items returns `nil` without an error. |
 | `OneOf` | An exact match from a list of allowed strings. |
 | `Secret` | A credential from a setting or file, or an unset `Secret`. |
 | `Fail` | A problem found by a caller's own validation. |
@@ -38,10 +38,11 @@ concurrent use.
 `r.Secret("PUBLISH_TOKEN")` always looks up `PUBLISH_TOKEN` and
 `PUBLISH_TOKEN_FILE`. Empty settings count as unset. A direct value is kept
 as-is. A file must be regular and at most 64 KiB, including any line endings.
-On Unix, it is opened without waiting for a FIFO writer and checked after
-opening. On other platforms the reader reports `secret files are not supported
-on this platform` rather than risk a blocking open. There is no
-file-permission check.
+On Unix, symlinks are followed, relative paths resolve against the process
+working directory, and the opened file is checked without waiting for a
+FIFO writer. On other platforms the reader reports
+`secret files are not supported on this platform` rather than risk a blocking
+open. There is no file-permission check.
 
 All trailing CR and LF bytes are stripped from file contents. Leading and
 interior newlines, spaces, and other bytes are preserved. A file that is empty
@@ -51,6 +52,17 @@ Use `IsSet()` for a presence check and `Reveal()` only at the point where the
 credential is needed. The formatting, slog, JSON, and text marshaling methods
 display `[redacted]` for a set secret and an empty string for an unset one.
 This does not protect the plain string returned by `Reveal()`.
+
+`Secret` is immutable and safe to share across goroutines. The `==` operator
+compares identity, not contents: two independent reads of the same non-empty
+credential compare unequal, and unset secrets equal the zero value. For
+credential comparisons, use `crypto/subtle` on the revealed value where a
+constant-time comparison is needed.
+
+Keep `Secret` fields exported if they should display `[redacted]` when
+formatted with `fmt`: an unexported field may display an address instead.
+Reflection-based dumpers that bypass methods can expose the credential.
+`encoding/gob` refuses to encode a `Secret`, which has no exported fields.
 
 ## Worked example
 

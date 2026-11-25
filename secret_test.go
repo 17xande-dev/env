@@ -3,6 +3,7 @@ package env_test
 import (
 	"bytes"
 	"encoding"
+	"encoding/gob"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -192,6 +193,15 @@ func TestSecretXML(t *testing.T) {
 		if err != nil || string(got) != tt.want {
 			t.Fatal("XML did not encode the expected display value")
 		}
+	}
+}
+
+func TestSecretGobFailsClosed(t *testing.T) {
+	secret := env.New(lookup(map[string]string{"TOKEN": credential})).Secret("TOKEN")
+	var out bytes.Buffer
+	err := gob.NewEncoder(&out).Encode(secret)
+	if err == nil || strings.Contains(err.Error(), credential) || bytes.Contains(out.Bytes(), []byte(credential)) {
+		t.Fatal("gob should refuse the secret without disclosing it")
 	}
 }
 

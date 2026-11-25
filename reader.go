@@ -18,7 +18,8 @@ type Reader struct {
 	problems []error
 }
 
-// New returns a reader that reads settings through lookup.
+// New returns a reader that reads settings through lookup, which must not be
+// nil. Reading a setting with a nil lookup panics.
 func New(lookup Lookup) *Reader {
 	return &Reader{lookup: lookup}
 }
@@ -54,8 +55,9 @@ func (r *Reader) Bool(key string, def bool) bool {
 	}
 }
 
-// Int reads a decimal integer between min and max, inclusive.
-// It returns def if the setting is unset, empty, or invalid.
+// Int reads a decimal integer between min and max, inclusive. Use math.MaxInt
+// if no additional upper bound is needed. It returns def as-is if the setting
+// is unset, empty, or invalid.
 func (r *Reader) Int(key string, def, min, max int) int {
 	value := r.text(key, "")
 	if value == "" {
@@ -98,7 +100,8 @@ func (r *Reader) Duration(key string, def, min, max time.Duration) time.Duration
 }
 
 // List splits the setting on commas, trims spaces from each item, and drops
-// empty items. It returns def if the setting itself is unset or empty.
+// empty items. It returns def itself, without copying, if the setting is unset
+// or empty. A non-empty setting with no items returns nil without an error.
 func (r *Reader) List(key string, def []string) []string {
 	value := r.text(key, "")
 	if value == "" {

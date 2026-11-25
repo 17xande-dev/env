@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/17xande-dev/env"
@@ -62,6 +63,19 @@ func TestEnvExampleRefusals(t *testing.T) {
 			checkFailure(t, func(tb testing.TB) { envtest.EnvExample(tb, path) }, tt.message)
 		})
 	}
+}
+
+func TestDocumentationFileErrorsIncludePath(t *testing.T) {
+	t.Run("open", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "missing")
+		checkFailure(t, func(tb testing.TB) { envtest.EnvExample(tb, path) },
+			fmt.Sprintf("cannot open documentation file %q", path))
+	})
+	t.Run("read", func(t *testing.T) {
+		path := fixture(t, strings.Repeat("x", 1<<20))
+		checkFailure(t, func(tb testing.TB) { envtest.EnvExample(tb, path) },
+			fmt.Sprintf("cannot read documentation file %q", path))
+	})
 }
 
 func TestMarkdownTable(t *testing.T) {

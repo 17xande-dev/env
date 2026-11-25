@@ -49,7 +49,7 @@ func TestString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := env.New(lookup(tt.env))
 			if got := r.String(setting, "default"); got != tt.want {
-				t.Fatal("String did not return the expected setting")
+				t.Errorf("String = %q, want %q", got, tt.want)
 			}
 			assertSettingError(t, r.Err(), "", tt.env)
 		})
@@ -71,7 +71,7 @@ func TestRequired(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := env.New(lookup(tt.env))
 			if got := r.Required(setting); got != tt.want {
-				t.Fatal("Required did not return the expected setting")
+				t.Errorf("Required = %q, want %q", got, tt.want)
 			}
 			assertSettingError(t, r.Err(), tt.problem, tt.env)
 		})
@@ -144,7 +144,7 @@ func TestInt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := env.New(lookup(tt.env))
 			if got := r.Int(setting, 3, tt.min, tt.max); got != tt.want {
-				t.Error("Int did not return the expected setting")
+				t.Errorf("Int = %d, want %d", got, tt.want)
 			}
 			assertSettingError(t, r.Err(), tt.problem, tt.env)
 		})
@@ -182,7 +182,7 @@ func TestDuration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := env.New(lookup(tt.env))
 			if got := r.Duration(setting, def, tt.min, tt.max); got != tt.want {
-				t.Error("Duration did not return the expected setting")
+				t.Errorf("Duration = %v, want %v", got, tt.want)
 			}
 			assertSettingError(t, r.Err(), tt.problem, tt.env)
 		})
@@ -204,8 +204,8 @@ func TestList(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			r := env.New(lookup(tt.env))
-			if got := r.List(setting, def); !slices.Equal(got, tt.want) {
-				t.Fatal("List did not return the expected items")
+			if got := r.List(setting, def); (got == nil) != (tt.want == nil) || !slices.Equal(got, tt.want) {
+				t.Errorf("List = %#v, want %#v", got, tt.want)
 			}
 			assertSettingError(t, r.Err(), "", tt.env)
 		})
@@ -230,7 +230,7 @@ func TestOneOf(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := env.New(lookup(tt.env))
 			if got := r.OneOf(setting, "info", "debug", "info"); got != tt.want {
-				t.Error("OneOf did not return the expected setting")
+				t.Errorf("OneOf = %q, want %q", got, tt.want)
 			}
 			assertSettingError(t, r.Err(), tt.problem, tt.env)
 		})

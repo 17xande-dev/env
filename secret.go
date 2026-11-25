@@ -76,6 +76,8 @@ func (r *Reader) readSecretFile(key, path string, open func(string) (secretFile,
 
 // Secret holds a credential. Its formatting, logging, and marshaling methods
 // emit "[redacted]" for a set secret and an empty string for an unset secret.
+// It is immutable and safe to share across goroutines. Equality compares
+// identity, not contents; use [Secret.IsSet] to check for presence.
 type Secret struct {
 	// fmt cannot invoke methods on an unexported field in a containing
 	// struct. Indirection keeps its fallback formatting from printing bytes.

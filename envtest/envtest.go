@@ -169,13 +169,13 @@ func scanLines(t testing.TB, path string, visit func(string) bool) {
 	t.Helper()
 	file, err := os.Open(path)
 	if err != nil {
-		t.Fatal("cannot open documentation file")
+		t.Fatalf("cannot open documentation file %q", path)
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() && visit(scanner.Text()) {
 	}
 	if scanner.Err() != nil {
-		t.Fatal("cannot read documentation file")
+		t.Fatalf("cannot read documentation file %q", path)
 	}
 }
