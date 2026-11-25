@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
+	"log"
 	"log/slog"
 	"strings"
 	"testing"
@@ -52,6 +54,8 @@ func TestSecretFormatting(t *testing.T) {
 	for _, tt := range []struct{ name, verb string }{
 		{"v", "%v"}, {"plus_v", "%+v"}, {"sharp_v", "%#v"},
 		{"string", "%s"}, {"quoted", "%q"}, {"hex", "%x"},
+		{"decimal", "%d"}, {"upper_hex", "%X"}, {"unicode", "%U"}, {"bool", "%t"},
+		{"width_precision", "%8.3v"}, {"left_aligned", "%-20s"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.verb == "%#v" {
@@ -68,6 +72,32 @@ func TestSecretFormatting(t *testing.T) {
 			}
 			if fmt.Sprintf(tt.verb, secret) != redacted || fmt.Sprintf(tt.verb, unset) != "" {
 				t.Fatal("formatting did not use the expected display value")
+			}
+		})
+	}
+	t.Run("type_and_pointer", func(t *testing.T) {
+		// fmt handles %T and %p itself, without calling Format.
+		if got := fmt.Sprintf("%T", secret); got != "env.Secret" {
+			t.Fatal("unexpected formatted type")
+		}
+		if got := fmt.Sprintf("%p", &secret); !strings.HasPrefix(got, "0x") || strings.Contains(got, credential) {
+			t.Fatal("pointer formatting did not show only an address")
+		}
+	})
+	for _, tt := range []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{"pointer", &secret, redacted},
+		{"map", map[string]env.Secret{"token": secret}, "map[token:" + redacted + "]"},
+		{"slice", []env.Secret{secret}, "[" + redacted + "]"},
+		{"interface_field", struct{ Token any }{secret}, "{" + redacted + "}"},
+		{"nested_struct", struct{ Inner struct{ Token env.Secret } }{struct{ Token env.Secret }{secret}}, "{{" + redacted + "}}"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if fmt.Sprint(tt.value) != tt.want || fmt.Sprintln(tt.value) != tt.want+"\n" {
+				t.Fatal("formatted value did not use the expected display value")
 			}
 		})
 	}
@@ -91,6 +121,13 @@ func TestSecretFormatting(t *testing.T) {
 			t.Fatal("formatted error did not redact its secret")
 		}
 	})
+	t.Run("log", func(t *testing.T) {
+		var out bytes.Buffer
+		log.New(&out, "", 0).Printf("token=%d", secret)
+		if out.String() != "token="+redacted+"\n" {
+			t.Fatal("log did not redact its secret")
+		}
+	})
 }
 
 func TestSecretSlog(t *testing.T) {
@@ -110,15 +147,17 @@ func TestSecretSlog(t *testing.T) {
 				want   string
 			}{{secret, redacted}, {env.Secret{}, ""}} {
 				out.Reset()
-				slog.New(handler).Info("configured", "token", tt.secret)
+				slog.New(handler).WithGroup("settings").Info("configured", "token", tt.secret)
 				if mode == "json" {
 					// The JSON handler can fall back to MarshalJSON if LogValue is missing.
 					s, ok := any(tt.secret).(slog.LogValuer)
 					if !ok || !s.LogValue().Equal(slog.StringValue(tt.want)) {
 						t.Fatal("LogValue did not provide the expected display value")
 					}
-					var record map[string]any
-					if err := json.Unmarshal(out.Bytes(), &record); err != nil || record["token"] != tt.want {
+					var record struct {
+						Settings map[string]string
+					}
+					if err := json.Unmarshal(out.Bytes(), &record); err != nil || record.Settings["token"] != tt.want {
 						t.Fatal("JSON handler did not emit the expected display value")
 					}
 				} else {
@@ -126,12 +165,33 @@ func TestSecretSlog(t *testing.T) {
 					if want == "" {
 						want = `""`
 					}
-					if !strings.HasSuffix(out.String(), " token="+want+"\n") {
+					if !strings.HasSuffix(out.String(), " settings.token="+want+"\n") {
 						t.Fatal("text handler did not emit the expected display value")
 					}
 				}
 			}
 		})
+	}
+}
+
+func TestSecretXML(t *testing.T) {
+	secret := env.New(lookup(map[string]string{"TOKEN": credential})).Secret("TOKEN")
+	type settings struct {
+		XMLName xml.Name   `xml:"settings"`
+		Token   env.Secret `xml:"token"`
+		Attr    env.Secret `xml:"token,attr"`
+	}
+	for _, tt := range []struct {
+		secret env.Secret
+		want   string
+	}{
+		{secret, `<settings token="[redacted]"><token>[redacted]</token></settings>`},
+		{env.Secret{}, `<settings token=""><token></token></settings>`},
+	} {
+		got, err := xml.Marshal(settings{Token: tt.secret, Attr: tt.secret})
+		if err != nil || string(got) != tt.want {
+			t.Fatal("XML did not encode the expected display value")
+		}
 	}
 }
 

@@ -32,9 +32,21 @@ func TestRecorder(t *testing.T) {
 }
 
 func TestEnvExample(t *testing.T) {
-	path := fixture(t, "  # comment\nFIRST=value\n# SECOND=\n  # THIRD=sample\nnot an assignment\n")
+	path := fixture(t, "\ufeffBOM=ignored\r\n  # comment\r\n\r\nFIRST=\"quoted = value\"\r\n# SECOND=\r\n"+
+		"  # THIRD='sample'\r\nSPACED = ignored\r\nnot an assignment\r\n")
 	if got, want := envtest.EnvExample(t, path), []string{"FIRST", "SECOND", "THIRD"}; !slices.Equal(got, want) {
 		t.Errorf("keys = %v, want %v", got, want)
+	}
+	for _, tt := range []struct{ name, line string }{
+		{"export", "export IGNORED="},
+		{"double_comment", "## IGNORED="},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			path := fixture(t, "KEY=\n"+tt.line+"\n")
+			if got, want := envtest.EnvExample(t, path), []string{"KEY"}; !slices.Equal(got, want) {
+				t.Errorf("keys = %v, want %v", got, want)
+			}
+		})
 	}
 }
 
@@ -61,12 +73,36 @@ func TestMarkdownTable(t *testing.T) {
 	}
 }
 
+func TestMarkdownTableHeadingBoundaries(t *testing.T) {
+	for _, tt := range []struct{ name, contents string }{
+		{"exact_heading", "## Settings extra\n| `PREFIX` | wrong section |\n## Settings\n| `FIRST` | right section |\n"},
+		{"higher_level_stop", "## Settings\n| `FIRST` | right section |\n# Other\n| `OUTSIDE` | outside section |\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			path := fixture(t, tt.contents)
+			if got, want := envtest.MarkdownTable(t, path, "## Settings"), []string{"FIRST"}; !slices.Equal(got, want) {
+				t.Errorf("keys = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestMarkdownTableIgnoresFencedCode(t *testing.T) {
+	path := fixture(t, "```md\n## Settings\n| `FAKE` | in a fence |\n```\n"+
+		"## Settings\n~~~~text\n# comment\n~~~\n| `INSIDE` | still in the fence |\n~~~~~\n"+
+		"| `FIRST` | real key |\n")
+	if got, want := envtest.MarkdownTable(t, path, "## Settings"), []string{"FIRST"}; !slices.Equal(got, want) {
+		t.Errorf("keys = %v, want %v", got, want)
+	}
+}
+
 func TestMarkdownTableRefusals(t *testing.T) {
 	for _, tt := range []struct {
 		name, contents, message string
 	}{
 		{"missing_heading", "## Other\n| `KEY` | ignored |\n", `missing Markdown heading "## Settings"`},
 		{"empty_section", "## Settings\n## Other\n| `KEY` | ignored |\n", `no environment keys under Markdown heading "## Settings"`},
+		{"duplicate", "## Settings\n| `KEY` | first |\n| `KEY` | second |\n", "duplicate environment key KEY"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			path := fixture(t, tt.contents)

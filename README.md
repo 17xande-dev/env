@@ -140,11 +140,17 @@ func TestConfigDocumentation(t *testing.T) {
 ```
 
 `Recorder.Lookup` records every requested key, including unset keys, and
-`Keys` returns the sorted, unique names. `EnvExample` includes commented
-assignments and rejects duplicate keys. `MarkdownTable` reads backticked keys
-in the first column beneath the named heading. `Documented` flags missing
-documentation, documented keys that were not read, and vacuous tests that read
-nothing.
+`Keys` returns the sorted, unique names. `EnvExample` accepts `KEY=` and
+`# KEY=` lines, with no spaces between the key and `=`. Values are not parsed,
+so quoted values are fine. Use each key exactly once: `KEY=` and `# KEY=`
+for the same key are a duplicate. Do not use `export KEY=`, `## KEY=`, or
+`KEY = value`: these lines are ignored. Save the file without a UTF-8 BOM.
+
+`MarkdownTable` reads backticked keys in the first column beneath the exact
+named heading. It skips fenced code blocks, stops at the next heading of the
+same or higher level, and rejects duplicate keys. `Documented` flags missing
+documentation, documented keys that were not read, and vacuous tests that
+read nothing.
 
 ## Changes
 

@@ -19,7 +19,7 @@ func TestSecretFileChecksOpenedDescriptor(t *testing.T) {
 		t.Fatal("cannot create symlink fixture")
 	}
 	r := New(nil)
-	secret := r.readSecretFile("TOKEN_FILE", path, func(name string) (*os.File, error) {
+	secret := r.readSecretFile("TOKEN_FILE", path, func(name string) (secretFile, error) {
 		// Swap a regular path for a directory between any path check and open.
 		if err := os.Rename(replacement, name); err != nil {
 			t.Fatal("cannot replace regular file fixture")
@@ -42,7 +42,7 @@ func TestSecretFileIgnoresPathReplacementAfterOpen(t *testing.T) {
 		t.Fatal("cannot create symlink fixture")
 	}
 	r := New(nil)
-	secret := r.readSecretFile("TOKEN_FILE", path, func(name string) (*os.File, error) {
+	secret := r.readSecretFile("TOKEN_FILE", path, func(name string) (secretFile, error) {
 		file, err := openSecretFile(name)
 		if err == nil {
 			// The path now names a directory, but the descriptor still names the file.

@@ -27,7 +27,12 @@ func (r *Reader) Secret(key string) Secret {
 	return r.readSecretFile(fileKey, path, openSecretFile)
 }
 
-func (r *Reader) readSecretFile(key, path string, open func(string) (*os.File, error)) Secret {
+type secretFile interface {
+	io.ReadCloser
+	Stat() (os.FileInfo, error)
+}
+
+func (r *Reader) readSecretFile(key, path string, open func(string) (secretFile, error)) Secret {
 	// Do not include OS errors: a path may itself contain a pasted credential.
 	file, err := open(path)
 	if err != nil {

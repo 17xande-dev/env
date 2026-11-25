@@ -43,6 +43,7 @@ var (
 )
 
 // EnvExample returns the keys of KEY= and # KEY= lines, in file order.
+// It ignores other lines rather than parsing dotenv or shell syntax.
 // It fails the test if a key appears twice or if no keys are found.
 func EnvExample(t testing.TB, path string) []string {
 	t.Helper()
@@ -68,7 +69,8 @@ func EnvExample(t testing.TB, path string) []string {
 
 // MarkdownTable returns the backticked keys in the first column under heading
 // (including its Markdown heading marks), in file order. It stops at the next
-// heading of the same or higher level and fails if the section has no keys.
+// heading of the same or higher level, ignoring fenced code blocks.
+// It fails if the section has no keys or contains duplicate keys.
 func MarkdownTable(t testing.TB, path, heading string) []string {
 	t.Helper()
 	heading = strings.TrimSpace(heading)
@@ -77,9 +79,21 @@ func MarkdownTable(t testing.TB, path, heading string) []string {
 		t.Fatalf("invalid Markdown heading %q", heading)
 	}
 	var keys []string
+	seen := make(map[string]bool)
 	found := false
+	var fence string
 	scanLines(t, path, func(line string) bool {
 		line = strings.TrimSpace(line)
+		if fence != "" {
+			if strings.HasPrefix(line, fence) && strings.Trim(line, fence[:1]) == "" {
+				fence = ""
+			}
+			return true
+		}
+		if marker := openingFence(line); marker != "" {
+			fence = marker
+			return true
+		}
 		if !found {
 			found = line == heading
 			return true
@@ -90,7 +104,12 @@ func MarkdownTable(t testing.TB, path, heading string) []string {
 		cell, _, ok := strings.Cut(strings.TrimPrefix(line, "|"), "|")
 		if ok {
 			if match := keyCell.FindStringSubmatch(strings.TrimSpace(cell)); match != nil {
-				keys = append(keys, match[1])
+				key := match[1]
+				if seen[key] {
+					t.Fatalf("duplicate environment key %s", key)
+				}
+				seen[key] = true
+				keys = append(keys, key)
 			}
 		}
 		return true
@@ -102,6 +121,18 @@ func MarkdownTable(t testing.TB, path, heading string) []string {
 		t.Fatalf("no environment keys under Markdown heading %q", heading)
 	}
 	return keys
+}
+
+func openingFence(line string) string {
+	if line == "" || (line[0] != '`' && line[0] != '~') {
+		return ""
+	}
+	rest := strings.TrimLeft(line, line[:1])
+	n := len(line) - len(rest)
+	if n < 3 || (line[0] == '`' && strings.Contains(rest, "`")) {
+		return ""
+	}
+	return line[:n]
 }
 
 func headingLevel(line string) int {

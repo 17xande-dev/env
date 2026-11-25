@@ -2,12 +2,9 @@
 
 package env
 
-import (
-	"errors"
-	"os"
-)
+import "errors"
 
-func openSecretFile(string) (*os.File, error) {
+func openSecretFile(string) (secretFile, error) {
 	// Do not fall back to an open that could block before the file is checked.
 	return nil, errors.ErrUnsupported
 }
