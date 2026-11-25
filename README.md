@@ -39,8 +39,9 @@ concurrent use.
 `PUBLISH_TOKEN_FILE`. Empty settings count as unset. A direct value is kept
 as-is. A file must be regular and at most 64 KiB, including any line endings.
 On Unix, it is opened without waiting for a FIFO writer and checked after
-opening. On other platforms the reader refuses file-backed credentials rather
-than risk a blocking open. There is no file-permission check.
+opening. On other platforms the reader reports `secret files are not supported
+on this platform` rather than risk a blocking open. There is no
+file-permission check.
 
 All trailing CR and LF bytes are stripped from file contents. Leading and
 interior newlines, spaces, and other bytes are preserved. A file that is empty

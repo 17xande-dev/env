@@ -1,6 +1,7 @@
 package env
 
 import (
+	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -56,5 +57,16 @@ func TestSecretFileReadErrorDoesNotEchoPath(t *testing.T) {
 	})
 	if err := r.Err(); s.IsSet() || err == nil || err.Error() != "TOKEN_FILE: cannot read secret file" {
 		t.Fatal("reader should record only the fixed read error without disclosing the path")
+	}
+}
+
+func TestSecretFileUnsupportedPlatform(t *testing.T) {
+	const path = "opaque-path-fragment"
+	r := New(nil)
+	s := r.readSecretFile("TOKEN_FILE", path, func(name string) (secretFile, error) {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: errors.ErrUnsupported}
+	})
+	if err := r.Err(); s.IsSet() || err == nil || err.Error() != "TOKEN_FILE: secret files are not supported on this platform" {
+		t.Fatal("reader should explain that secret files are unsupported without disclosing the path")
 	}
 }

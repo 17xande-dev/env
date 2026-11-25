@@ -2,6 +2,7 @@ package env
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -35,7 +36,11 @@ type secretFile interface {
 func (r *Reader) readSecretFile(key, path string, open func(string) (secretFile, error)) Secret {
 	// Do not include OS errors: a path may itself contain a pasted credential.
 	file, err := open(path)
-	if err != nil {
+	switch {
+	case errors.Is(err, errors.ErrUnsupported):
+		r.Fail(key, "secret files are not supported on this platform")
+		return Secret{}
+	case err != nil:
 		r.Fail(key, "cannot open secret file")
 		return Secret{}
 	}
