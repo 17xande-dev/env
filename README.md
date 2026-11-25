@@ -155,7 +155,7 @@ read nothing.
 
 ## Changes
 
-- **v0.1.0** (planned): Typed environment settings, aggregated value-free
+- **v0.1.0:** Typed environment settings, aggregated value-free
   configuration errors, redacted credentials, and documentation parity tests.
 
 ## License
