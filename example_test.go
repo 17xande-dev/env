@@ -2,9 +2,12 @@ package env_test
 
 import (
 	"fmt"
+	"os"
+	"testing"
 	"time"
 
 	"github.com/17xande-dev/env"
+	"github.com/17xande-dev/env/envtest"
 )
 
 func ExampleReader() {
@@ -51,4 +54,51 @@ func ExampleReader_Err() {
 	// ACTIVE: must be "true" or "false"
 	// QUEUE: is required
 	// MODE: requires at least one target
+}
+
+func ExampleReader_Secret() {
+	values := map[string]string{"PUBLISH": "true", "PUBLISH_TOKEN": "fixture"}
+	cfg, err := load(envtest.NewRecorder(values).Lookup)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(cfg.Publish, cfg.Token.IsSet(), cfg.Token)
+	// Output: true true [redacted]
+}
+
+type Config struct {
+	Label   string
+	Publish bool
+	Token   env.Secret
+}
+
+func Load() (Config, error) {
+	return load(os.LookupEnv)
+}
+
+func load(lookup env.Lookup) (Config, error) {
+	r := env.New(lookup)
+	cfg := Config{
+		Label:   r.String("LABEL", "worker"),
+		Publish: r.Bool("PUBLISH", false),
+		Token:   r.Secret("PUBLISH_TOKEN"),
+	}
+	if cfg.Publish && !cfg.Token.IsSet() {
+		r.Fail("PUBLISH_TOKEN", "is required when publishing is enabled (or set PUBLISH_TOKEN_FILE)")
+	}
+	if err := r.Err(); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
+func TestConfigDocumentation(t *testing.T) {
+	recorder := envtest.NewRecorder(nil)
+	if _, err := load(recorder.Lookup); err != nil {
+		t.Fatal(err)
+	}
+	read := recorder.Keys()
+	envtest.Documented(t, ".env.example", read, envtest.EnvExample(t, "testdata/.env.example"))
+	envtest.Documented(t, "README", read, envtest.MarkdownTable(t, "README.md", "## Configuration"))
 }
